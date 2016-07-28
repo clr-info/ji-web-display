@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -24,8 +23,9 @@ type Site struct {
 var (
 	sites []Site
 	datac = make(chan Site)
-	host  = "127.0.0.1"
-	port  = flag.Int("port", 80, "Web server port")
+	host  = ""
+	port  = "80"
+	addr  = flag.String("addr", ":"+port, "[hostname|ip]:port for web server")
 )
 
 func main() {
@@ -41,7 +41,15 @@ func main() {
 	}
 	rand.Seed(42)
 
-	host = getHostIP()
+	var err error
+	host, port, err = net.SplitHostPort(*addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if host == "" {
+		host = getHostIP()
+	}
 
 	in, err := ioutil.ReadFile(flag.Arg(0))
 	if err != nil {
@@ -59,7 +67,7 @@ func main() {
 
 	http.HandleFunc("/", pageHandle)
 	http.Handle("/data", websocket.Handler(dataHandler))
-	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+	err = http.ListenAndServe(*addr, nil)
 	if err != nil {
 		done <- true
 		log.Fatal(err)
@@ -80,7 +88,7 @@ func generate(datac chan Site, done chan bool) {
 }
 
 func pageHandle(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, page, host, *port)
+	fmt.Fprintf(w, page, host, port)
 }
 
 func dataHandler(ws *websocket.Conn) {
@@ -106,7 +114,7 @@ const page = `
 		};
 
 		window.onload = function() {
-			sock = new WebSocket("ws://%s:%d/data");
+			sock = new WebSocket("ws://%s:%s/data");
 			sock.onmessage = function(event) {
 				var data = JSON.parse(event.data);
 				console.log("--> ["+data.url+"]");

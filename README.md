@@ -13,7 +13,7 @@ $> cat test.json
 		{"url": "https://golang.org", "time": 10},
 ]
 
-$> ji-web-display -port=9090 ./test.json &
+$> ji-web-display -addr=:9090 ./test.json &
 $> open http://127.0.0.1:9090
 ```
 
