@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"text/template"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -22,16 +23,14 @@ type Site struct {
 
 var (
 	sites []Site
-	datac = make(chan Site)
-	host  = ""
-	port  = "80"
-	addr  = flag.String("addr", ":"+port, "[hostname|ip]:port for web server")
 )
 
 func main() {
 
 	log.SetFlags(0)
 	log.SetPrefix("ji-web-display: ")
+
+	var addr = flag.String("addr", ":80", "[hostname|ip]:port for web server")
 
 	flag.Parse()
 
@@ -41,8 +40,7 @@ func main() {
 	}
 	rand.Seed(42)
 
-	var err error
-	host, port, err = net.SplitHostPort(*addr)
+	host, port, err := net.SplitHostPort(*addr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,39 +61,152 @@ func main() {
 	fmt.Println(sites)
 
 	done := make(chan bool)
-	go generate(datac, done)
+	srv := newServer(host + ":" + port)
 
-	http.HandleFunc("/", pageHandle)
-	http.Handle("/data", websocket.Handler(dataHandler))
-	err = http.ListenAndServe(*addr, nil)
+	go generate(srv.datac, done)
+
+	mux := http.NewServeMux()
+	mux.Handle("/", srv)
+	mux.Handle("/data", websocket.Handler(srv.dataHandler))
+	err = http.ListenAndServe(srv.Addr, mux)
 	if err != nil {
 		done <- true
 		log.Fatal(err)
 	}
 }
 
-func generate(datac chan Site, done chan bool) {
+type server struct {
+	Addr    string
+	Default string
+	tmpl    *template.Template
+
+	urlReg registry // clients interested in URLs
+
+	datac chan []byte
+}
+
+func newServer(addr string) *server {
+	srv := &server{
+		Addr:    addr,
+		Default: "http://in2p3.fr",
+		tmpl:    template.Must(template.New("ji-web").Parse(page)),
+		urlReg:  newRegistry(),
+		datac:   make(chan []byte),
+	}
+	go srv.run()
+	return srv
+}
+
+func (srv *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	srv.tmpl.Execute(w, srv)
+}
+
+func (srv *server) run() {
 	for {
-		site := sites[rand.Intn(len(sites))]
 		select {
-		case datac <- site:
-			duration := time.Duration(site.Time) * time.Second
-			time.Sleep(duration)
-		case <-done:
-			return
+		case c := <-srv.urlReg.register:
+			srv.urlReg.clients[c] = true
+			log.Printf("new client: %v\n", c)
+
+		case c := <-srv.urlReg.unregister:
+			if _, ok := srv.urlReg.clients[c]; ok {
+				delete(srv.urlReg.clients, c)
+				close(c.datac)
+				log.Printf("client disconnected [%v]\n", c.ws.LocalAddr())
+			}
+
+		case data := <-srv.datac:
+			/*
+				dataBuf := new(bytes.Buffer)
+				err := json.NewEncoder(dataBuf).Encode(data)
+				if err != nil {
+					log.Printf("error marshalling data: %v\n", err)
+					continue
+				}
+			*/
+			for c := range srv.urlReg.clients {
+				select {
+				case c.datac <- data:
+				default:
+					close(c.datac)
+					delete(srv.urlReg.clients, c)
+				}
+			}
 		}
 	}
 }
 
-func pageHandle(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, page, host, port)
+func (srv *server) dataHandler(ws *websocket.Conn) {
+	c := &client{
+		srv:   srv,
+		reg:   &srv.urlReg,
+		datac: make(chan []byte, 256),
+		ws:    ws,
+	}
+	c.reg.register <- c
+	defer c.Release()
+
+	c.run()
 }
 
-func dataHandler(ws *websocket.Conn) {
-	for data := range datac {
-		err := websocket.JSON.Send(ws, data)
+type client struct {
+	srv   *server
+	reg   *registry
+	ws    *websocket.Conn
+	datac chan []byte
+}
+
+func (c *client) Release() {
+	c.reg.unregister <- c
+	c.ws.Close()
+	c.reg = nil
+	c.srv = nil
+}
+
+func (c *client) run() {
+	//c.ws.SetReadLimit(maxMessageSize)
+	//c.ws.SetReadDeadline(time.Now().Add(pongWait))
+	//c.ws.SetPongHandler(func(string) error { c.ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	for data := range c.datac {
+		err := websocket.Message.Send(c.ws, string(data))
 		if err != nil {
-			log.Printf("error sending data: %v\n", err)
+			log.Printf(
+				"error sending data to [%v]: %v\n",
+				c.ws.LocalAddr(),
+				err,
+			)
+			break
+		}
+	}
+}
+
+type registry struct {
+	clients    map[*client]bool
+	register   chan *client
+	unregister chan *client
+}
+
+func newRegistry() registry {
+	return registry{
+		clients:    make(map[*client]bool),
+		register:   make(chan *client),
+		unregister: make(chan *client),
+	}
+}
+
+func generate(datac chan []byte, done chan bool) {
+	for {
+		site := sites[rand.Intn(len(sites))]
+		data, err := json.Marshal(site)
+		if err != nil {
+			log.Fatal(err)
+			continue
+		}
+		select {
+		case datac <- data:
+			duration := time.Duration(site.Time) * time.Second
+			time.Sleep(duration)
+		case <-done:
 			return
 		}
 	}
@@ -114,7 +225,7 @@ const page = `
 		};
 
 		window.onload = function() {
-			sock = new WebSocket("ws://%s:%s/data");
+			sock = new WebSocket("ws://{{.Addr}}/data");
 			sock.onmessage = function(event) {
 				var data = JSON.parse(event.data);
 				console.log("--> ["+data.url+"]");
@@ -126,7 +237,7 @@ const page = `
 
 	<body style="overflow:hidden;">
 		<div id="site-title"></div>
-		<iframe id="site-frame" height=100%% width=100%% style="border:none;" src=""></iframe>
+		<iframe id="site-frame" height=100%% width=100%% style="border:none;" src="{{.Default}}"></iframe>
 	</body>
 </html>
 `
