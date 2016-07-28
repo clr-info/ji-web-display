@@ -237,7 +237,7 @@ const page = `
 
 	<body style="overflow:hidden;">
 		<div id="site-title"></div>
-		<iframe id="site-frame" height=100%% width=100%% style="border:none;" src="{{.Default}}"></iframe>
+		<iframe id="site-frame" height=100% width=100% style="border:none;" src="{{.Default}}"></iframe>
 	</body>
 </html>
 `
