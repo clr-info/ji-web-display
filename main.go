@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/clr-info/ji-web-display/indico"
 	"golang.org/x/net/websocket"
 )
 
@@ -30,7 +31,10 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("ji-web-display: ")
 
-	var addr = flag.String("addr", ":80", "[hostname|ip]:port for web server")
+	var (
+		addr  = flag.String("addr", ":80", "[hostname|ip]:port for web server")
+		evtid = flag.Int("evtid", 12779, "event id")
+	)
 
 	flag.Parse()
 
@@ -60,8 +64,14 @@ func main() {
 	}
 	fmt.Println(sites)
 
+	tbl, err := indico.FetchTimeTable("indico.in2p3.fr", *evtid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// log.Printf("=== timetable ===\n%s\n", spew.Sdump(tbl))
+
 	done := make(chan bool)
-	srv := newServer(host + ":" + port)
+	srv := newServer(host+":"+port, tbl)
 
 	go generate(srv.datac, done)
 
@@ -82,16 +92,18 @@ type server struct {
 
 	urlReg registry // clients interested in URLs
 
-	datac chan []byte
+	datac  chan []byte
+	ttable *indico.TimeTable
 }
 
-func newServer(addr string) *server {
+func newServer(addr string, timeTable *indico.TimeTable) *server {
 	srv := &server{
 		Addr:    addr,
 		Default: "http://in2p3.fr",
 		tmpl:    template.Must(template.New("ji-web").Parse(page)),
 		urlReg:  newRegistry(),
 		datac:   make(chan []byte),
+		ttable:  timeTable,
 	}
 	go srv.run()
 	return srv
