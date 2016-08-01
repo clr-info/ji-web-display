@@ -5,29 +5,18 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"text/template"
 	"time"
 
 	"github.com/clr-info/ji-web-display/indico"
 	"golang.org/x/net/websocket"
-)
-
-type Site struct {
-	URL  string `json:"url"`
-	Time int64  `json:"time"`
-}
-
-var (
-	sites []Site
 )
 
 func main() {
@@ -42,12 +31,6 @@ func main() {
 
 	flag.Parse()
 
-	if flag.NArg() < 1 {
-		flag.Usage()
-		log.Fatalf("ji-web-display myconfig.json\n")
-	}
-	rand.Seed(42)
-
 	host, port, err := net.SplitHostPort(*addr)
 	if err != nil {
 		log.Fatal(err)
@@ -57,44 +40,27 @@ func main() {
 		host = getHostIP()
 	}
 
-	in, err := ioutil.ReadFile(flag.Arg(0))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(in, &sites)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(sites)
-
 	tbl, err := indico.FetchTimeTable("indico.in2p3.fr", *evtid)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// log.Printf("=== timetable ===\n%s\n", spew.Sdump(tbl))
+	sort.Sort(byDays(tbl.Days))
 
-	done := make(chan bool)
 	srv := newServer(host+":"+port, tbl)
-
-	go generate(srv.datac, done)
-
 	mux := http.NewServeMux()
 	mux.Handle("/", srv)
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
 	err = http.ListenAndServe(srv.Addr, mux)
 	if err != nil {
-		done <- true
 		log.Fatal(err)
 	}
 }
 
 type server struct {
-	Addr    string
-	Default string
-	tmpl    *template.Template
+	Addr string
+	tmpl *template.Template
 
-	urlReg registry // clients interested in URLs
+	reg registry // clients interested in URLs
 
 	datac  chan []byte
 	ttable *indico.TimeTable
@@ -102,13 +68,15 @@ type server struct {
 
 func newServer(addr string, timeTable *indico.TimeTable) *server {
 	srv := &server{
-		Addr:    addr,
-		Default: "http://in2p3.fr",
-		tmpl:    template.Must(template.New("ji-web").Parse(page)),
-		urlReg:  newRegistry(),
-		datac:   make(chan []byte),
-		ttable:  timeTable,
+		Addr: addr,
+		tmpl: template.Must(template.Must(template.New("ji-web").Funcs(template.FuncMap{
+			"displayP": displayPresenters,
+		}).Parse(mainPage)).Parse(agendaTmpl)),
+		reg:    newRegistry(),
+		datac:  make(chan []byte),
+		ttable: timeTable,
 	}
+	go srv.crawler()
 	go srv.run()
 	return srv
 }
@@ -120,13 +88,13 @@ func (srv *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (srv *server) run() {
 	for {
 		select {
-		case c := <-srv.urlReg.register:
-			srv.urlReg.clients[c] = true
+		case c := <-srv.reg.register:
+			srv.reg.clients[c] = true
 			log.Printf("new client: %v\n", c)
 
-		case c := <-srv.urlReg.unregister:
-			if _, ok := srv.urlReg.clients[c]; ok {
-				delete(srv.urlReg.clients, c)
+		case c := <-srv.reg.unregister:
+			if _, ok := srv.reg.clients[c]; ok {
+				delete(srv.reg.clients, c)
 				close(c.datac)
 				log.Printf("client disconnected [%v]\n", c.ws.LocalAddr())
 			}
@@ -140,22 +108,45 @@ func (srv *server) run() {
 					continue
 				}
 			*/
-			for c := range srv.urlReg.clients {
+			for c := range srv.reg.clients {
 				select {
 				case c.datac <- data:
 				default:
 					close(c.datac)
-					delete(srv.urlReg.clients, c)
+					delete(srv.reg.clients, c)
 				}
 			}
 		}
 	}
 }
 
+func (srv *server) crawler() {
+	beat := 5 * time.Second
+	ticker := time.NewTicker(beat)
+	defer ticker.Stop()
+
+	loc := srv.ttable.Days[0].Date.Location()
+	now := time.Date(2016, 9, 27, 10, 0, 0, 0, loc)
+
+	for {
+		select {
+		case <-ticker.C:
+			buf := new(bytes.Buffer)
+			now = now.Add(beat)
+			data := newAgenda(now, srv.ttable)
+			// data.Day += " (" + now.Format("2006-01-02 - 15:04:05") + ")"
+			err := srv.tmpl.ExecuteTemplate(buf, "agenda", data)
+			if err != nil {
+				log.Fatal(err)
+			}
+			srv.datac <- buf.Bytes()
+		}
+	}
+}
 func (srv *server) dataHandler(ws *websocket.Conn) {
 	c := &client{
 		srv:   srv,
-		reg:   &srv.urlReg,
+		reg:   &srv.reg,
 		datac: make(chan []byte, 256),
 		ws:    ws,
 	}
@@ -180,9 +171,6 @@ func (c *client) Release() {
 }
 
 func (c *client) run() {
-	//c.ws.SetReadLimit(maxMessageSize)
-	//c.ws.SetReadDeadline(time.Now().Add(pongWait))
-	//c.ws.SetPongHandler(func(string) error { c.ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for data := range c.datac {
 		err := websocket.Message.Send(c.ws, string(data))
 		if err != nil {
@@ -210,52 +198,63 @@ func newRegistry() registry {
 	}
 }
 
-func generate(datac chan []byte, done chan bool) {
-	for {
-		site := sites[rand.Intn(len(sites))]
-		data, err := json.Marshal(site)
-		if err != nil {
-			log.Fatal(err)
-			continue
-		}
-		select {
-		case datac <- data:
-			duration := time.Duration(site.Time) * time.Second
-			time.Sleep(duration)
-		case <-done:
-			return
-		}
-	}
-}
-
-const page = `
+const mainPage = `<!DOCTYPE html>
 <html>
 	<head>
 		<title>JI-2016 Web Display</title>
+		<style>
+			body {
+				font-family: sans-serif;
+			}
+			h2 {
+				background: #ddd;
+			}
+			#sidebar {
+				float: right;
+			}
+		</style>
 		<script type="text/javascript">
 		var sock = null;
 
-		function update(url) {
-			var doc = document.getElementById("site-frame");
-			doc.src = url;
+		function update(data) {
+			var doc = document.getElementById("agenda");
+			doc.innerHTML = data;
 		};
 
 		window.onload = function() {
 			sock = new WebSocket("ws://{{.Addr}}/data");
 			sock.onmessage = function(event) {
-				var data = JSON.parse(event.data);
-				console.log("--> ["+data.url+"]");
-				update(data.url);
+				//var data = JSON.parse(event.data);
+				// console.log("--> ["+data.url+"]");
+				update(event.data);
 			};
 		};
 		</script>
 	</head>
 
-	<body style="overflow:hidden;">
-		<div id="site-title"></div>
-		<iframe id="site-frame" height=100% width=100% style="border:none;" src="{{.Default}}"></iframe>
+	<body>
+		<div id="agenda"></div>
 	</body>
 </html>
+`
+
+const agendaTmpl = `{{define "agenda"}}
+<h1 id="agenda-day">{{.Day}}</h1>
+{{block "session" .Sessions}}{{end}}
+{{end}}
+
+{{define "session"}}
+{{- range . }}
+<h2>{{.Title}} ({{.Start}} - {{.Stop}})</h2>
+<ul>
+{{- range .Contributions}}
+	<li>{{.Title}} ({{.Duration}}) {{block "presenters" .Presenters}}{{end}}</li>
+{{- end}}
+</ul>
+{{- end}}
+{{end}}
+
+{{define "presenters"}}{{displayP .}}{{end}}
 `
 
 func getHostIP() string {
