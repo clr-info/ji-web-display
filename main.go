@@ -209,19 +209,19 @@ const mainPage = `<!DOCTYPE html>
 			h2 {
 				color:      #fff;
 				background: #034f84;
+				margin-bottom: 2px;
 			}
-			[id=current-session] {
+			h2#current-session {
 				color:      #fff;
 				background: #f7786b;
 			}
 			h3 {
 				background: #92a8d1;
+				margin-top: 1px;
+				margin-bottom: 1px;
 			}
-			[id=current-contribution] {
+			#current-contribution {
 				background: #f7cac9;
-			}
-			#sidebar {
-				float: right;
 			}
 		</style>
 		<script type="text/javascript">
@@ -256,7 +256,7 @@ const agendaTmpl = `{{define "agenda"}}
 {{- range . }}
 <h2 id="{{.Active}}">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
 {{- range .Contributions}}
-	<div id="{{.Active}}">
+	<div id="{{.Active}}" style="border: solid 1px; margin-bottom: 1px">
 		<h3 id="{{.Active}}">{{.Start}} - {{.Stop}}</h3>
 		<b>{{.Title}}</b> (<i>{{.Duration}}</i>)
 		{{block "presenters" .Presenters}}{{end}}
