@@ -199,10 +199,6 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 		day := Day{
 			Sessions: make([]Session, 0, len(mday)),
 		}
-		day.Date, err = time.Parse("20060102", k)
-		if err != nil {
-			return nil, err
-		}
 		for _, msession := range mday {
 			var session Session
 			err = json.Unmarshal(msession, &session)
@@ -211,6 +207,11 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 			}
 			session.sanitize()
 			day.Sessions = append(day.Sessions, session)
+		}
+		loc := day.Sessions[0].StartDate.Location()
+		day.Date, err = time.ParseInLocation("20060102", k, loc)
+		if err != nil {
+			return nil, err
 		}
 		tbl.Days = append(tbl.Days, day)
 	}
