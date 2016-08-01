@@ -7,32 +7,31 @@ package indico
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 )
 
 type TimeTable struct {
-	ID   int    `json:"id"`
-	URL  string `json:"url"`
-	Days []Day  `json:"days"`
+	ID   int
+	URL  string
+	Days []Day
 }
 
 type Day struct {
-	Date     time.Time `json:"date"`
-	Sessions []Session `json:"sessions"`
+	Date     time.Time
+	Sessions []Session
 }
 
 type EntryID struct {
-	ID          string        `json:"id"`
-	Title       string        `json:"title"`
-	Description string        `json:"description"`
-	Location    string        `json:"location"`
-	Room        string        `json:"room"`
-	StartDate   time.Time     `json:"startDate"`
-	EndDate     time.Time     `json:"endDate"`
-	Duration    time.Duration `json:"duration"`
+	ID          string
+	Title       string
+	Description string
+	Location    string
+	Room        string
+	StartDate   time.Time
+	EndDate     time.Time
+	Duration    time.Duration
 }
 
 func (eid *EntryID) UnmarshalJSON(data []byte) error {
@@ -75,11 +74,78 @@ type Session struct {
 	Contributions []Contribution `json:"entries,omitempty"`
 }
 
+func (s *Session) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID            string                  `json:"id"`
+		Title         string                  `json:"title"`
+		Description   string                  `json:"description"`
+		Location      string                  `json:"location"`
+		Room          string                  `json:"room"`
+		StartDate     indicoTime              `json:"startDate"`
+		EndDate       indicoTime              `json:"endDate"`
+		Duration      indicoDuration          `json:"duration"`
+		Contributions map[string]Contribution `json:"entries"`
+	}
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+
+	s.EntryID = EntryID{
+		ID:          raw.ID,
+		Title:       raw.Title,
+		Description: raw.Description,
+		Location:    raw.Location,
+		Room:        raw.Room,
+		StartDate:   raw.StartDate.Time,
+		EndDate:     raw.EndDate.Time,
+		Duration:    raw.Duration.Duration,
+	}
+	s.Contributions = nil
+	for _, c := range raw.Contributions {
+		c.sanitize()
+		s.Contributions = append(s.Contributions, c)
+	}
+	return nil
+}
+
 type Contribution struct {
 	EntryID
-	Material   []interface{} `json:"material"`
-	URL        string        `json:"url"`
-	Presenters []Presenter   `json:"presenters"`
+	URL        string
+	Presenters []Presenter
+}
+
+func (c *Contribution) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ID          string         `json:"id"`
+		Title       string         `json:"title"`
+		Description string         `json:"description"`
+		Location    string         `json:"location"`
+		Room        string         `json:"room"`
+		StartDate   indicoTime     `json:"startDate"`
+		EndDate     indicoTime     `json:"endDate"`
+		Duration    indicoDuration `json:"duration"`
+		URL         string         `json:"url"`
+		Presenters  []Presenter    `json:"presenters"`
+	}
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+
+	c.EntryID = EntryID{
+		ID:          raw.ID,
+		Title:       raw.Title,
+		Description: raw.Description,
+		Location:    raw.Location,
+		Room:        raw.Room,
+		StartDate:   raw.StartDate.Time,
+		EndDate:     raw.EndDate.Time,
+		Duration:    raw.Duration.Duration,
+	}
+	c.URL = raw.URL
+	c.Presenters = raw.Presenters
+	return nil
 }
 
 type Presenter struct {
@@ -137,36 +203,13 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 		if err != nil {
 			return nil, err
 		}
-		for sid, msession := range mday {
-			var v struct {
-				EntryID
-				Contributions map[string]Contribution `json:"entries,omitempty"`
-			}
-			switch sid[0] {
-			case 's':
-				err = json.Unmarshal(msession, &v)
-			case 'b':
-				err = json.Unmarshal(msession, &v.EntryID)
-				if err != nil {
-					return nil, err
-				}
-			default:
-				log.Panicf("indico: unknown session id type %q\n", sid)
-			}
+		for _, msession := range mday {
+			var session Session
+			err = json.Unmarshal(msession, &session)
 			if err != nil {
 				return nil, err
 			}
-			session := Session{
-				EntryID: v.EntryID,
-			}
-			session.EntryID.sanitize()
-			if len(v.Contributions) > 0 {
-				session.Contributions = make([]Contribution, 0, len(v.Contributions))
-				for _, vv := range v.Contributions {
-					vv.EntryID.sanitize()
-					session.Contributions = append(session.Contributions, vv)
-				}
-			}
+			session.sanitize()
 			day.Sessions = append(day.Sessions, session)
 		}
 		tbl.Days = append(tbl.Days, day)
