@@ -207,7 +207,18 @@ const mainPage = `<!DOCTYPE html>
 				font-family: sans-serif;
 			}
 			h2 {
-				background: #ddd;
+				color:      #fff;
+				background: #034f84;
+			}
+			[id=current-session] {
+				color:      #fff;
+				background: #f7786b;
+			}
+			h3 {
+				background: #92a8d1;
+			}
+			[id=current-contribution] {
+				background: #f7cac9;
 			}
 			#sidebar {
 				float: right;
@@ -224,8 +235,6 @@ const mainPage = `<!DOCTYPE html>
 		window.onload = function() {
 			sock = new WebSocket("ws://{{.Addr}}/data");
 			sock.onmessage = function(event) {
-				//var data = JSON.parse(event.data);
-				// console.log("--> ["+data.url+"]");
 				update(event.data);
 			};
 		};
@@ -245,16 +254,18 @@ const agendaTmpl = `{{define "agenda"}}
 
 {{define "session"}}
 {{- range . }}
-<h2>{{.Title}} ({{.Start}} - {{.Stop}})</h2>
-<ul>
+<h2 id="{{.Active}}">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
 {{- range .Contributions}}
-	<li>{{.Title}} ({{.Duration}}) {{block "presenters" .Presenters}}{{end}}</li>
+	<div id="{{.Active}}">
+		<h3 id="{{.Active}}">{{.Start}} - {{.Stop}}</h3>
+		<b>{{.Title}}</b> (<i>{{.Duration}}</i>)
+		{{block "presenters" .Presenters}}{{end}}
+	</div>
 {{- end}}
-</ul>
 {{- end}}
 {{end}}
 
-{{define "presenters"}}{{displayP .}}{{end}}
+{{define "presenters"}}<p>{{displayP .}}</p>{{end}}
 `
 
 func getHostIP() string {

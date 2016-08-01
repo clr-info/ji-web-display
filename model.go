@@ -22,12 +22,30 @@ type Session struct {
 	Room          string
 	Start, Stop   string
 	Contributions []Contribution
+	active        bool
+}
+
+func (s Session) Active() string {
+	if s.active {
+		return "current-session"
+	}
+	return ""
 }
 
 type Contribution struct {
 	Title      string
+	Start      string
+	Stop       string
 	Duration   time.Duration
 	Presenters []Presenter
+	active     bool
+}
+
+func (c Contribution) Active() string {
+	if c.active {
+		return "current-contribution"
+	}
+	return ""
 }
 
 type Presenter struct {
@@ -72,7 +90,14 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 	for _, s := range day.Sessions {
 		sort.Sort(contrByTime(s.Contributions))
 		var contr []Contribution
+		activeSession := date.Before(s.EndDate) && date.After(s.StartDate)
 		for _, c := range s.Contributions {
+			if !activeSession {
+				continue
+			}
+			if c.EndDate.Before(date) {
+				continue
+			}
 			var p []Presenter
 			for _, pp := range c.Presenters {
 				p = append(p, Presenter{
@@ -81,10 +106,14 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 					Email:       pp.Email,
 				})
 			}
+			activeContr := date.Before(c.EndDate) && date.After(c.StartDate)
 			contr = append(contr, Contribution{
 				Title:      c.Title,
+				Start:      c.StartDate.Format("15:04"),
+				Stop:       c.EndDate.Format("15:04"),
 				Duration:   c.Duration,
 				Presenters: p,
+				active:     activeContr,
 			})
 		}
 		agenda.Sessions = append(agenda.Sessions, Session{
@@ -93,6 +122,7 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 			Start:         s.StartDate.Format("15:04"),
 			Stop:          s.EndDate.Format("15:04"),
 			Contributions: contr,
+			active:        activeSession,
 		})
 	}
 	return agenda
