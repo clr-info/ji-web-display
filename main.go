@@ -121,7 +121,7 @@ func (srv *server) run() {
 }
 
 func (srv *server) crawler() {
-	beat := 5 * time.Second
+	beat := 1 * time.Second
 	ticker := time.NewTicker(beat)
 	defer ticker.Stop()
 
