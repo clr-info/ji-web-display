@@ -126,7 +126,7 @@ func (srv *server) crawler() {
 	defer ticker.Stop()
 
 	loc := srv.ttable.Days[0].Date.Location()
-	now := time.Date(2016, 9, 27, 10, 0, 0, 0, loc)
+	now := time.Date(2016, 9, 27, 10, 04, 30, 0, loc)
 
 	for {
 		select {
