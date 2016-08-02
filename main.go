@@ -7,11 +7,13 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"sort"
+	"sync"
 	"text/template"
 	"time"
 
@@ -50,6 +52,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", srv)
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
+	mux.HandleFunc("/refresh-timetable", srv.refreshTableHandler)
 	err = http.ListenAndServe(srv.Addr, mux)
 	if err != nil {
 		log.Fatal(err)
@@ -63,6 +66,7 @@ type server struct {
 	reg registry // clients interested in URLs
 
 	datac  chan []byte
+	mu     sync.RWMutex
 	ttable *indico.TimeTable
 }
 
@@ -133,8 +137,9 @@ func (srv *server) crawler() {
 		case <-ticker.C:
 			buf := new(bytes.Buffer)
 			now = now.Add(beat)
+			srv.mu.RLock()
 			data := newAgenda(now, srv.ttable)
-			// data.Day += " (" + now.Format("2006-01-02 - 15:04:05") + ")"
+			srv.mu.RUnlock()
 			err := srv.tmpl.ExecuteTemplate(buf, "agenda", data)
 			if err != nil {
 				log.Fatal(err)
@@ -154,6 +159,28 @@ func (srv *server) dataHandler(ws *websocket.Conn) {
 	defer c.Release()
 
 	c.run()
+}
+
+func (srv *server) refreshTableHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "invalid http request", http.StatusBadRequest)
+		return
+	}
+
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+
+	id := srv.ttable.ID
+	log.Printf("refreshing timetable-%d...\n", id)
+	tbl, err := indico.FetchTimeTable("indico.in2p3.fr", srv.ttable.ID)
+	if err != nil {
+		log.Printf("error fetching timetable-%d: %v\n", id, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	srv.ttable = tbl
+	log.Printf("refreshing timetable-%d... [done]\n", id)
+	fmt.Fprintf(w, "timetable-%d refreshed\n", id)
 }
 
 type client struct {
