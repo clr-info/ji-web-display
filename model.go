@@ -127,7 +127,47 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 			active:        activeSession,
 		})
 	}
+	trimPastSessions(&agenda)
+	trimFutureSessions(&agenda)
 	return agenda
+}
+
+// trimPastSessions removes unnecessary past sessions
+func trimPastSessions(agenda *Agenda) {
+	idx := -1
+	for i, s := range agenda.Sessions {
+		if s.active {
+			idx = i
+			break
+		}
+	}
+	if idx > 2 {
+		i := idx - 2
+		if i < 0 {
+			i = 2
+		}
+		agenda.Sessions = agenda.Sessions[i:]
+	}
+}
+
+// trimFutureSessions removes unnecessary future sessions
+func trimFutureSessions(agenda *Agenda) {
+	idx := len(agenda.Sessions)
+	for i, s := range agenda.Sessions {
+		if s.active {
+			idx = i
+		}
+	}
+	if len(agenda.Sessions)-idx > 4 {
+		i := idx + 4
+		merged := Session{
+			Title: " ... ",
+			Start: agenda.Sessions[i].Start,
+			Stop:  agenda.Sessions[len(agenda.Sessions)-1].Stop,
+		}
+		agenda.Sessions = agenda.Sessions[:i]
+		agenda.Sessions = append(agenda.Sessions, merged)
+	}
 }
 
 func sortTimeTable(tbl *indico.TimeTable) {
