@@ -139,9 +139,23 @@ func (d byDays) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
 type sessionsByDays []indico.Session
 
-func (p sessionsByDays) Len() int           { return len(p) }
-func (p sessionsByDays) Less(i, j int) bool { return p[i].StartDate.Unix() < p[j].StartDate.Unix() }
-func (p sessionsByDays) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p sessionsByDays) Len() int { return len(p) }
+func (p sessionsByDays) Less(i, j int) bool {
+	pi := p[i]
+	pj := p[j]
+	si := pi.StartDate.Unix()
+	sj := pj.StartDate.Unix()
+	if si != sj {
+		return si < sj
+	}
+	ei := pi.EndDate.Unix()
+	ej := pj.EndDate.Unix()
+	if ei != ej {
+		return ei < ej
+	}
+	return pi.ID < pj.ID
+}
+func (p sessionsByDays) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
 
 type contrByTime []indico.Contribution
 
