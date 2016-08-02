@@ -89,7 +89,6 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 		return agenda
 	}
 
-	sort.Sort(sessionsByDays(day.Sessions))
 	for _, s := range day.Sessions {
 		sort.Sort(contrByTime(s.Contributions))
 		var contr []Contribution
@@ -129,6 +128,22 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 		})
 	}
 	return agenda
+}
+
+func sortTimeTable(tbl *indico.TimeTable) {
+	if tbl == nil || tbl.Days == nil {
+		return
+	}
+
+	sort.Sort(byDays(tbl.Days))
+	for i, day := range tbl.Days {
+		sort.Sort(sessionsByDays(day.Sessions))
+		for j, sess := range day.Sessions {
+			sort.Sort(contrByTime(sess.Contributions))
+			day.Sessions[j] = sess
+		}
+		tbl.Days[i] = day
+	}
 }
 
 type byDays []indico.Day

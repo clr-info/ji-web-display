@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sort"
 	"sync"
 	"text/template"
 	"time"
@@ -46,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	sort.Sort(byDays(tbl.Days))
+	sortTimeTable(tbl)
 
 	srv := newServer(host+":"+port, tbl)
 	mux := http.NewServeMux()
@@ -179,6 +178,7 @@ func (srv *server) refreshTableHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	srv.ttable = tbl
+	sortTimeTable(srv.ttable)
 	log.Printf("refreshing timetable-%d... [done]\n", id)
 	fmt.Fprintf(w, "timetable-%d refreshed\n", id)
 }
