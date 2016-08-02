@@ -26,11 +26,29 @@ func main() {
 	log.SetPrefix("ji-web-display: ")
 
 	var (
-		addr  = flag.String("addr", ":80", "[hostname|ip]:port for web server")
-		evtid = flag.Int("evtid", 12779, "event id")
+		addr      = flag.String("addr", ":80", "[hostname|ip]:port for web server")
+		evtid     = flag.Int("evtid", 12779, "event id")
+		nowLayout = "2006-01-02 15:04:05"
+		snow      = flag.String("now", "", "agenda time. format="+nowLayout)
+		sloc      = flag.String("loc", "Europe/Paris", "agenda time location")
 	)
 
 	flag.Parse()
+
+	var now time.Time
+	switch *snow {
+	case "":
+		now = time.Now()
+	default:
+		loc, err := time.LoadLocation(*sloc)
+		if err != nil {
+			log.Fatal(err)
+		}
+		now, err = time.ParseInLocation(nowLayout, *snow, loc)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	host, port, err := net.SplitHostPort(*addr)
 	if err != nil {
@@ -47,7 +65,7 @@ func main() {
 	}
 	sortTimeTable(tbl)
 
-	srv := newServer(host+":"+port, tbl)
+	srv := newServer(host+":"+port, tbl, now)
 	mux := http.NewServeMux()
 	mux.Handle("/", srv)
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
@@ -62,20 +80,22 @@ type server struct {
 	Addr string
 	tmpl *template.Template
 
-	reg registry // clients interested in URLs
+	reg registry
 
+	now    time.Time
 	datac  chan []byte
 	mu     sync.RWMutex
 	ttable *indico.TimeTable
 }
 
-func newServer(addr string, timeTable *indico.TimeTable) *server {
+func newServer(addr string, timeTable *indico.TimeTable, now time.Time) *server {
 	srv := &server{
 		Addr: addr,
 		tmpl: template.Must(template.Must(template.New("ji-web").Funcs(template.FuncMap{
 			"displayP": displayPresenters,
 		}).Parse(mainPage)).Parse(agendaTmpl)),
 		reg:    newRegistry(),
+		now:    now,
 		datac:  make(chan []byte),
 		ttable: timeTable,
 	}
@@ -128,8 +148,10 @@ func (srv *server) crawler() {
 	ticker := time.NewTicker(beat)
 	defer ticker.Stop()
 
-	loc := srv.ttable.Days[0].Date.Location()
-	now := time.Date(2016, 9, 27, 10, 4, 50, 0, loc)
+	// loc := srv.ttable.Days[0].Date.Location()
+	// now := time.Date(2016, 9, 27, 10, 4, 50, 0, loc)
+
+	now := srv.now
 
 	for {
 		select {
