@@ -184,6 +184,10 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 		return nil, err
 	}
 
+	if !raw.Complete {
+		return nil, fmt.Errorf("indico: incomplete timetable")
+	}
+
 	mdays, ok := raw.Results[strconv.Itoa(evtid)]
 	if !ok || len(mdays) == 0 {
 		return nil, fmt.Errorf("indico: no event with id=%d", evtid)
@@ -208,7 +212,10 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 			session.sanitize()
 			day.Sessions = append(day.Sessions, session)
 		}
-		loc := day.Sessions[0].StartDate.Location()
+		loc := time.UTC
+		if len(day.Sessions) > 0 {
+			loc = day.Sessions[0].StartDate.Location()
+		}
 		day.Date, err = time.ParseInLocation("20060102", k, loc)
 		if err != nil {
 			return nil, err
