@@ -20,6 +20,11 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+var (
+	// FIXME(sbinet): remove
+	devTest = flag.Bool("dev-test", false, "enable test development mode")
+)
+
 func main() {
 
 	log.SetFlags(0)
@@ -157,6 +162,19 @@ func (srv *server) crawler() {
 		select {
 		case <-ticker.C:
 			buf := new(bytes.Buffer)
+			if *devTest {
+				h := now.Hour()
+				switch {
+				case h >= 0 && h < 8:
+					beat = 1 * time.Hour
+				case h >= 8 && h <= 18:
+					beat = 3 * time.Minute
+				case h > 18 && h <= 22:
+					beat = 30 * time.Minute
+				case h > 22:
+					beat = 1 * time.Hour
+				}
+			}
 			now = now.Add(beat)
 			srv.mu.RLock()
 			data := newAgenda(now, srv.ttable)
@@ -166,6 +184,14 @@ func (srv *server) crawler() {
 				log.Fatal(err)
 			}
 			srv.datac <- buf.Bytes()
+			if *devTest {
+				layout := "2006-01-02 15:04 -0700"
+				end, _ := time.Parse(layout, "2016-09-29 12:12 +0200")
+				start, _ := time.Parse(layout, "2016-09-26 14:45 +0200")
+				if now.After(end) || now.Before(start) {
+					now = start.Add(10 * time.Second)
+				}
+			}
 		}
 	}
 }
