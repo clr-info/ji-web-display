@@ -82,8 +82,11 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 	}
 
 	agenda := Agenda{
-		Day:      date.Format("2006-01-02 -- 15:04:05"),
-		Sessions: make([]Session, 0, len(day.Sessions)),
+		Day: date.Format("2006-01-02 -- 15:04:05"),
+	}
+
+	if day == nil {
+		return agenda
 	}
 
 	sort.Sort(sessionsByDays(day.Sessions))
