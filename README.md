@@ -5,15 +5,8 @@ A simple Go-based web server to display the [JI-2016](https://indico.in2p3.fr/ev
 ## Examples
 
 ```shell
-$> cat test.json
-[
-		{"url": "http://clrwww.in2p3.fr", "time": 10},
-		{"url": "https://indico.in2p3.fr/event/12779/", "time": 10},
-		{"url": "https://www.cern.ch", "time": 5},
-		{"url": "https://golang.org", "time": 10},
-]
-
-$> ji-web-display -addr=:9090 ./test.json &
+$> go get github.com/clr-info/ji-web-display
+$> ji-web-display -addr=:9090 -dev-test -now="2016-09-27 10:45:00" &
 $> open http://127.0.0.1:9090
 ```
 
