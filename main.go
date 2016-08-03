@@ -316,6 +316,7 @@ const mainPage = `<!DOCTYPE html>
 			}
 			.clock {
 				float: right;
+				vertical-align : bottom;
 				background: #111;
 				color:      #fff;
 				width: 200px;
