@@ -25,11 +25,11 @@ type Session struct {
 	active        bool
 }
 
-func (s Session) Active() string {
+func (s Session) CSSClass() string {
 	if s.active {
 		return "current-session"
 	}
-	return ""
+	return "session"
 }
 
 type Contribution struct {
@@ -41,11 +41,11 @@ type Contribution struct {
 	active     bool
 }
 
-func (c Contribution) Active() string {
+func (c Contribution) CSSClass() string {
 	if c.active {
 		return "current-contribution"
 	}
-	return ""
+	return "contribution"
 }
 
 type Presenter struct {
@@ -82,7 +82,7 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 	}
 
 	agenda := Agenda{
-		Day: date.Format("2006-01-02 -- 15:04:05"),
+		Day: date.Format("2006-01-02<br>15:04:05"),
 	}
 
 	if day == nil {

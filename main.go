@@ -276,27 +276,53 @@ func newRegistry() registry {
 const mainPage = `<!DOCTYPE html>
 <html>
 	<head>
+		<meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+		<meta charset="utf-8">
 		<title>JI-2016 Web Display</title>
 		<style>
+    :host {
+      display: block;
+      box-sizing: border-box;
+      text-align: center;
+      margin: 5px;
+      max-width: 250px;
+      min-width: 200px;
+    }
 			body {
-				font-family: sans-serif;
+				font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+				font-weight: 300;
 			}
-			h2 {
+			.session-container {
 				color:      #fff;
-				background: #034f84;
 				margin-bottom: 2px;
+				border-radius: 5px 5px 5px 5px;
 			}
-			h2#current-session {
-				color:      #fff;
+			.session {
+				background: #034f84;
+			}
+			.current-session {
 				background: #f7786b;
 			}
-			h3 {
+			.contribution {
 				background: #92a8d1;
+			}
+			.current-contribution {
+				background: #f7cac9;
+			}
+			.contribution-container {
 				margin-top: 1px;
 				margin-bottom: 1px;
+				border-radius: 5px 5px 5px 5px;
 			}
-			#current-contribution {
-				background: #f7cac9;
+			.clock {
+				float: right;
+				background: #111;
+				color:      #fff;
+				width: 200px;
+				height: 80px;
+				font-size: 200%;
+				text-align: center;
+				border-radius: 10px 10px 10px 10px;
 			}
 		</style>
 		<script type="text/javascript">
@@ -323,16 +349,16 @@ const mainPage = `<!DOCTYPE html>
 `
 
 const agendaTmpl = `{{define "agenda"}}
-<h1 id="agenda-day">{{.Day}}</h1>
+<div id="agenda-day" class="clock">{{.Day}}</div>
 {{block "session" .Sessions}}{{end}}
 {{end}}
 
 {{define "session"}}
 {{- range . }}
-<h2 id="{{.Active}}">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
+<h2 class="{{.CSSClass}} session-container">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
 {{- range .Contributions}}
-	<div id="{{.Active}}" style="border: solid 1px; margin-bottom: 1px">
-		<h3 id="{{.Active}}">{{.Start}} - {{.Stop}}</h3>
+	<div class="{{.CSSClass}} contribution-container" style="border: solid 1px; margin-bottom: 1px;">
+		<h3 class="{{.CSSClass}} contribution-container">{{.Start}} - {{.Stop}}</h3>
 		<b>{{.Title}}</b> (<i>{{.Duration}}</i>)
 		{{block "presenters" .Presenters}}{{end}}
 	</div>
