@@ -294,6 +294,7 @@ const mainPage = `<!DOCTYPE html>
 				background: rgba(77, 62, 42, 0.14) -webkit-linear-gradient(left bottom,  rgba(13, 77, 104, 0.55), rgba(238, 238, 238, 0.8)) no-repeat scroll 0px 0;
 				background: rgba(77, 62, 42, 0.14)    -moz-linear-gradient(center top,   rgba(13, 77, 104, 0.75) 31%, #434343 101%) no-repeat scroll 0px 0;
 				background: rgba(77, 62, 42, 0.14)         linear-gradient(to center top,rgba(13, 77, 104, 0.75), #434343) no-repeat scroll 0px 0;
+				background-attachment: fixed;
 			}
 			.session-container {
 				padding:    6px;
