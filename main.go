@@ -304,11 +304,11 @@ const mainPage = `<!DOCTYPE html>
 			}
 			.session {
 				background:  #394c50;
-				text-shadow: 5px 2px 5px #000;;
+				text-shadow: 5px 2px 5px #000;
 			}
 			.current-session {
 				background:  #c7a30a;
-				text-shadow: 4px 3px 5px #000;;
+				text-shadow: 4px 3px 5px #000;
 			}
 			.contribution {
 				background: #427777;
