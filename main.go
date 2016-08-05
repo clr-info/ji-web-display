@@ -280,39 +280,50 @@ const mainPage = `<!DOCTYPE html>
 		<meta charset="utf-8">
 		<title>JI-2016 Web Display</title>
 		<style>
-    :host {
-      display: block;
-      box-sizing: border-box;
-      text-align: center;
-      margin: 5px;
-      max-width: 250px;
-      min-width: 200px;
-    }
+			:host {
+				display: block;
+				box-sizing: border-box;
+				text-align: center;
+				margin: 5px;
+				max-width: 250px;
+				min-width: 200px;
+			}
 			body {
 				font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 				font-weight: 300;
+				background: rgba(77, 62, 42, 0.14) -webkit-linear-gradient(left bottom,  rgba(13, 77, 104, 0.55), rgba(238, 238, 238, 0.8)) no-repeat scroll 0px 0;
+				background: rgba(77, 62, 42, 0.14)    -moz-linear-gradient(center top,   rgba(13, 77, 104, 0.75) 31%, #434343 101%) no-repeat scroll 0px 0;
+				background: rgba(77, 62, 42, 0.14)         linear-gradient(to center top,rgba(13, 77, 104, 0.75), #434343) no-repeat scroll 0px 0;
 			}
 			.session-container {
+				padding:    6px;
 				color:      #fff;
 				margin-bottom: 2px;
 				border-radius: 5px 5px 5px 5px;
 			}
 			.session {
-				background: #034f84;
+				background:  #394c50;
+				text-shadow: 5px 2px 5px #000;;
 			}
 			.current-session {
-				background: #f7786b;
+				background:  #c7a30a;
+				text-shadow: 4px 3px 5px #000;;
 			}
 			.contribution {
-				background: #92a8d1;
+				background: #427777;
+				color:      #ffffcc;
 			}
 			.current-contribution {
-				background: #f7cac9;
+				background: #fcb72b;
 			}
 			.contribution-container {
+				padding:    6px;
 				margin-top: 1px;
 				margin-bottom: 1px;
 				border-radius: 5px 5px 5px 5px;
+			}
+			h3.contribution-container{
+				padding:0px;
 			}
 			.clock {
 				float: right;
@@ -351,6 +362,7 @@ const mainPage = `<!DOCTYPE html>
 
 const agendaTmpl = `{{define "agenda"}}
 <div id="agenda-day" class="clock">{{.Day}}</div>
+<br style="clear:both;">
 {{block "session" .Sessions}}{{end}}
 {{end}}
 
@@ -358,7 +370,7 @@ const agendaTmpl = `{{define "agenda"}}
 {{- range . }}
 <h2 class="{{.CSSClass}} session-container">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
 {{- range .Contributions}}
-	<div class="{{.CSSClass}} contribution-container" style="border: solid 1px; margin-bottom: 1px;">
+	<div class="{{.CSSClass}} contribution-container">
 		<h3 class="{{.CSSClass}} contribution-container">{{.Start}} - {{.Stop}}</h3>
 		<b>{{.Title}}</b> (<i>{{.Duration}}</i>)
 		{{block "presenters" .Presenters}}{{end}}
