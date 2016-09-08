@@ -64,20 +64,21 @@ func main() {
 		host = getHostIP()
 	}
 
+	var tbl *indico.TimeTable
+
 	_, err = net.LookupIP("indico.in2p3.fr")
 	if err != nil {
 		log.Printf("error looking up 'indico.in2p3.fr': %v\n", err)
-		log.Printf("sleeping for 5s...\n")
-		time.Sleep(5 * time.Second)
-		_, err = net.LookupIP("indico.in2p3.fr")
+		log.Printf("loading cached table...\n")
+		tbl, err = loadCachedTable(*evtid)
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	tbl, err := indico.FetchTimeTable("indico.in2p3.fr", *evtid)
-	if err != nil {
-		log.Fatal(err)
+	} else {
+		tbl, err = indico.FetchTimeTable("indico.in2p3.fr", *evtid)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	sortTimeTable(tbl)
 

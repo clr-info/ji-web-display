@@ -7,6 +7,7 @@ package indico
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
@@ -178,26 +179,39 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 	}
 	defer resp.Body.Close()
 
-	var raw timetableResponse
-	err = json.NewDecoder(resp.Body).Decode(&raw)
+	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	if !raw.Complete {
-		return nil, fmt.Errorf("indico: incomplete timetable")
+	tbl := TimeTable{ID: evtid}
+	err = json.Unmarshal(buf, &tbl)
+	if err != nil {
+		return nil, err
 	}
 
+	return &tbl, err
+}
+
+func (tbl *TimeTable) UnmarshalJSON(data []byte) error {
+	var raw timetableResponse
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+
+	if !raw.Complete {
+		return fmt.Errorf("indico: incomplete timetable")
+	}
+
+	evtid := tbl.ID
 	mdays, ok := raw.Results[strconv.Itoa(evtid)]
 	if !ok || len(mdays) == 0 {
-		return nil, fmt.Errorf("indico: no event with id=%d", evtid)
+		return fmt.Errorf("indico: no event with id=%d", evtid)
 	}
 
-	tbl := &TimeTable{
-		ID:   evtid,
-		URL:  raw.URL,
-		Days: make([]Day, 0, len(mdays)),
-	}
+	tbl.URL = raw.URL
+	tbl.Days = make([]Day, 0, len(mdays))
 
 	for k, mday := range mdays {
 		day := Day{
@@ -207,7 +221,7 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 			var session Session
 			err = json.Unmarshal(msession, &session)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			session.sanitize()
 			day.Sessions = append(day.Sessions, session)
@@ -218,10 +232,10 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 		}
 		day.Date, err = time.ParseInLocation("20060102", k, loc)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		tbl.Days = append(tbl.Days, day)
 	}
 
-	return tbl, nil
+	return nil
 }
