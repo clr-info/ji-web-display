@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -88,6 +89,11 @@ func main() {
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
 	mux.HandleFunc("/refresh-time", srv.refreshTime)
 	mux.HandleFunc("/refresh-timetable", srv.refreshTableHandler)
+
+	if !*devTest {
+		go refreshTime(srv.Addr)
+	}
+
 	err = http.ListenAndServe(srv.Addr, mux)
 	if err != nil {
 		log.Fatal(err)
@@ -435,4 +441,24 @@ func getHostIP() string {
 
 	log.Fatalf("could not infer host IP")
 	return ""
+}
+
+func refreshTime(url string) {
+	beat := 10 * time.Minute
+	ticker := time.NewTicker(beat)
+	defer ticker.Stop()
+
+	url += "/refresh-time"
+	if !strings.HasPrefix(url, "http") {
+		url = "http://" + url
+	}
+	for {
+		select {
+		case <-ticker.C:
+			_, err := http.Post(url, "", nil)
+			if err != nil {
+				log.Printf("error refreshing time: %v\n", err)
+			}
+		}
+	}
 }
