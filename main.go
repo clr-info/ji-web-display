@@ -6,8 +6,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -89,6 +91,7 @@ func main() {
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
 	mux.HandleFunc("/refresh-time", srv.refreshTime)
 	mux.HandleFunc("/refresh-timetable", srv.refreshTableHandler)
+	mux.HandleFunc("/logo", srv.logoHandler)
 
 	if !*devTest {
 		go refreshTime(srv.Addr)
@@ -229,6 +232,11 @@ func (srv *server) dataHandler(ws *websocket.Conn) {
 	defer c.Release()
 
 	c.run()
+}
+
+func (srv *server) logoHandler(w http.ResponseWriter, r *http.Request) {
+	img := base64.NewDecoder(base64.StdEncoding, bytes.NewReader([]byte(logoData)))
+	io.Copy(w, img)
 }
 
 func (srv *server) refreshTime(w http.ResponseWriter, r *http.Request) {
@@ -374,6 +382,9 @@ const mainPage = `<!DOCTYPE html>
 				text-align: center;
 				border-radius: 10px 10px 10px 10px;
 			}
+			.logo {
+				height: 80px;
+			}
 		</style>
 		<script type="text/javascript">
 		var sock = null;
@@ -400,6 +411,7 @@ const mainPage = `<!DOCTYPE html>
 
 const agendaTmpl = `{{define "agenda"}}
 <div id="agenda-day" class="clock">{{.Day}}</div>
+<div id="agenda-logo"><img src="/logo" class="logo"></img></div>
 <br style="clear:both;">
 {{block "session" .Sessions}}{{end}}
 {{end}}
