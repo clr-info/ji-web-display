@@ -86,6 +86,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", srv)
 	mux.Handle("/data", websocket.Handler(srv.dataHandler))
+	mux.HandleFunc("/refresh-time", srv.refreshTime)
 	mux.HandleFunc("/refresh-timetable", srv.refreshTableHandler)
 	err = http.ListenAndServe(srv.Addr, mux)
 	if err != nil {
@@ -99,6 +100,7 @@ type server struct {
 
 	reg registry
 
+	timec  chan time.Time
 	now    time.Time
 	datac  chan []byte
 	mu     sync.RWMutex
@@ -112,6 +114,7 @@ func newServer(addr string, timeTable *indico.TimeTable, now time.Time) *server 
 			"displayP": displayPresenters,
 		}).Parse(mainPage)).Parse(agendaTmpl)),
 		reg:    newRegistry(),
+		timec:  make(chan time.Time),
 		now:    now,
 		datac:  make(chan []byte),
 		ttable: timeTable,
@@ -172,6 +175,8 @@ func (srv *server) crawler() {
 
 	for {
 		select {
+		case srv.now = <-srv.timec:
+			now = srv.now
 		case <-ticker.C:
 			buf := new(bytes.Buffer)
 			if *devTest {
@@ -218,6 +223,19 @@ func (srv *server) dataHandler(ws *websocket.Conn) {
 	defer c.Release()
 
 	c.run()
+}
+
+func (srv *server) refreshTime(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "invalid http request", http.StatusBadRequest)
+		return
+	}
+	go func() {
+		log.Printf("refreshing server internal time...\n")
+		srv.timec <- time.Now()
+		log.Printf("refreshing server internal time... [done]\n")
+
+	}()
 }
 
 func (srv *server) refreshTableHandler(w http.ResponseWriter, r *http.Request) {
