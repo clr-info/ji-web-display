@@ -11,4 +11,22 @@ $> open http://127.0.0.1:9090
 ```
 
 
+## Handlers
 
+### /refresh-timetable
+
+Manually refresh (and fetch from indico) the time table:
+
+```sh
+$> curl -X POST http://localhost:9090/refresh-timetable
+timetable-12779 refreshed
+```
+
+### /refresh-timetable
+
+Manually refresh the internal server time:
+
+```sh
+$> curl -X POST http://localhost:9090/refresh-time
+time is now: 2016-09-08 14:05:53.177434474 +0100 BST
+```

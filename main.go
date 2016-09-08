@@ -230,12 +230,13 @@ func (srv *server) refreshTime(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid http request", http.StatusBadRequest)
 		return
 	}
+	now := time.Now()
 	go func() {
 		log.Printf("refreshing server internal time...\n")
-		srv.timec <- time.Now()
+		srv.timec <- now
 		log.Printf("refreshing server internal time... [done]\n")
-
 	}()
+	fmt.Fprintf(w, "time is now: %v\n", now)
 }
 
 func (srv *server) refreshTableHandler(w http.ResponseWriter, r *http.Request) {
