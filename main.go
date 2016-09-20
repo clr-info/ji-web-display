@@ -418,7 +418,7 @@ const agendaTmpl = `{{define "agenda"}}
 
 {{define "session"}}
 {{- range . }}
-<h2 class="{{.CSSClass}} session-container">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}Room: {{.Room}}{{end}}</h2>
+<h2 class="{{.CSSClass}} session-container">{{.Title}} ({{.Start}} - {{.Stop}}) {{if .Room | ne "" }}-- {{.Room}}{{end}}</h2>
 {{- range .Contributions}}
 	<div class="{{.CSSClass}} contribution-container">
 		<h3 class="{{.CSSClass}} contribution-container">{{.Start}} - {{.Stop}}</h3>
