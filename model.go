@@ -141,10 +141,11 @@ func trimPastSessions(agenda *Agenda) {
 			break
 		}
 	}
-	if idx > 2 {
-		i := idx - 2
+	const head = 1
+	if idx > head {
+		i := idx - head
 		if i < 0 {
-			i = 2
+			i = head
 		}
 		agenda.Sessions = agenda.Sessions[i:]
 	}
