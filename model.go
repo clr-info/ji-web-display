@@ -128,6 +128,7 @@ func newAgenda(date time.Time, table *indico.TimeTable) Agenda {
 		})
 	}
 	trimPastSessions(&agenda)
+	trimActiveSessions(&agenda)
 	trimFutureSessions(&agenda)
 	return agenda
 }
@@ -148,6 +149,37 @@ func trimPastSessions(agenda *Agenda) {
 			i = head
 		}
 		agenda.Sessions = agenda.Sessions[i:]
+	}
+}
+
+// trimActiveSessions removes unnecessary contributions of active sessions
+func trimActiveSessions(agenda *Agenda) {
+	for ii, s := range agenda.Sessions {
+		if !s.active {
+			continue
+		}
+		idx := 0
+		for i, c := range s.Contributions {
+			if c.active {
+				idx = i
+			}
+		}
+		if len(s.Contributions)-idx > 3 {
+			i := idx + 3
+			merged := Contribution{
+				Title: " ... ",
+				Start: s.Contributions[i].Start,
+				Stop:  s.Contributions[len(s.Contributions)-1].Stop,
+			}
+			var sum time.Duration
+			for j := i; j < len(s.Contributions); j++ {
+				sum += s.Contributions[j].Duration
+			}
+			merged.Duration = sum
+			s.Contributions = s.Contributions[:i]
+			s.Contributions = append(s.Contributions, merged)
+			agenda.Sessions[ii] = s
+		}
 	}
 }
 
