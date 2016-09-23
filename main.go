@@ -152,14 +152,6 @@ func (srv *server) run() {
 			}
 
 		case data := <-srv.datac:
-			/*
-				dataBuf := new(bytes.Buffer)
-				err := json.NewEncoder(dataBuf).Encode(data)
-				if err != nil {
-					log.Printf("error marshalling data: %v\n", err)
-					continue
-				}
-			*/
 			for c := range srv.reg.clients {
 				select {
 				case c.datac <- data:
@@ -176,9 +168,6 @@ func (srv *server) crawler() {
 	beat := 1 * time.Second
 	ticker := time.NewTicker(beat)
 	defer ticker.Stop()
-
-	// loc := srv.ttable.Days[0].Date.Location()
-	// now := time.Date(2016, 9, 27, 10, 4, 50, 0, loc)
 
 	now := srv.now
 
