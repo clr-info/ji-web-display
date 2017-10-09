@@ -159,7 +159,6 @@ type Presenter struct {
 type timetableResponse struct {
 	Count     int              `json:"count"`
 	Type      string           `json:"_type"`
-	Complete  bool             `json:"complete"`
 	URL       string           `json:"url"`
 	Timestamp int64            `json:"ts"`
 	Results   timetableResults `json:"results"`
@@ -175,19 +174,19 @@ func FetchTimeTable(host string, evtid int) (*TimeTable, error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not GET timetable: %v", err)
 	}
 	defer resp.Body.Close()
 
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read all response body: %v", err)
 	}
 
 	tbl := TimeTable{ID: evtid}
 	err = json.Unmarshal(buf, &tbl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal JSON response: %v", err)
 	}
 
 	return &tbl, err
@@ -198,10 +197,6 @@ func (tbl *TimeTable) UnmarshalJSON(data []byte) error {
 	err := json.Unmarshal(data, &raw)
 	if err != nil {
 		return err
-	}
-
-	if !raw.Complete {
-		return fmt.Errorf("indico: incomplete timetable")
 	}
 
 	evtid := tbl.ID
